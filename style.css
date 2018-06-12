@@ -1,0 +1,55 @@
+.parent>.holder {
+    display: none;
+}
+
+.floated {
+    width: 46%;
+    float: left;
+    margin: 15px;
+}
+
+.parent.open>.holder {
+    display: block;
+}
+
+.parent>.content {
+    padding-left: 30px;
+    position: relative;
+    cursor: pointer;
+}
+
+.parent.open>.content:before {
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 10px solid #000;
+    transform: translateY(-35%);
+}
+
+.parent>.content:before {
+    position: absolute;
+    content: "";
+    left: 10px;
+    top: 50%;
+    width: 0;
+    height: 0;
+    border-top: 5px solid transparent;
+    border-left: 10px solid #000;
+    border-bottom: 5px solid transparent;
+    transform: translateY(-50%);
+}
+
+.content {
+    padding-left: 15px;
+}
+
+.holder {
+    margin-top: 10px;
+    border-radius: 10px;
+}
+
+.holder>.content {
+    border: 1px solid;
+    border-radius: 10px;
+}
