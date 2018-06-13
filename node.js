@@ -1,134 +1,108 @@
 var VirtualNode = (function () {
+    var color = {};
+    color[Node.ELEMENT_NODE] = '#60a2ff';
+    color[Node.TEXT_NODE] = '#ff9a2e';
+    color[Node.COMMENT_NODE] = '#3d9929';
+
     function VirtualNode(el) {
         this.tag = el.tagName;
-        this.nodeName = el.nodeName;
-        this.originalNode = el;
         this.children = [];
-        this.classList = el.className ? el.className.split(' ') : [];
-        this.contentElement = null;
-        this.blockElement = null;
         this.nodeType = el.nodeType;
-        this.content = this.registerContent(el);
+        this.nodeName = el.nodeName;
+        this.classNames = el.className ? el.className.split(' ').map(c => '.' + c) : [];
+        this.opened = false;
+        this.content = el.nodeValue === null ?
+            '' : el.nodeValue.trim();
+        this.holderElement = document.createElement('div');
+        this.contentElement = document.createElement('div');
+        this.init();
     }
 
-    VirtualNode.prototype.concatChildren = function (children) {
-        this.children = this.children.concat(children);
+    VirtualNode.prototype.init = function () {
+        this.holderElement.appendChild(this.contentElement);
+        VirtualNode.appendClasses(['holder'], this.holderElement);
+        VirtualNode.appendClasses(['content'], this.contentElement);
+        this.updateColor();
     }
 
-    VirtualNode.prototype.registerContent = function (el) {
-        return el.nodeType === Node.TEXT_NODE &&
-            el.tagName !== 'SCRIPT' ? el.nodeValue.trim() || '' : '';
+    VirtualNode.prototype.getContent = function () {
+        return (this.nodeName || this.tag) +
+            ' ' + this.content + ' ' +
+            this.classNames.join('');
     }
 
-    VirtualNode.appendStyles = function (styleObj, el) {
-        for (var i in styleObj) {
-            if (styleObj.hasOwnProperty(i)) {
-                el.style[i] = styleObj[i];
-            }
-        }
+    VirtualNode.prototype.updateColor = function () {
+        this.contentElement.style.backgroundColor = color[this.nodeType];
     }
 
     VirtualNode.appendClasses = function (classList, el) {
+        classList = Array.isArray(classList) ? classList : [];
         classList.forEach(function (className) {
             el.classList.add(className);
         });
-    };
-
-    return VirtualNode;
-}())
-
-var Virtual = (function (VirtualNode) {
-    var colors = {};
-    colors[Node.ELEMENT_NODE] = '#60a2ff';
-    colors[Node.TEXT_NODE] = '#ff9a2e';
-    colors[Node.COMMENT_NODE] = '#3d9929';
-
-    function virtualize(el) {
-        var vArr = [];
-        el.childNodes.forEach(function (child) {
-            var virtualEl = new VirtualNode(child);
-            virtualEl.concatChildren(virtualize(child));
-            vArr.push(virtualEl);
-        });
-        return vArr;
     }
 
-    function vizualize(el) {
-        var virtualized = virtualize(el);
-        var rendered = render(virtualized);
-        return rendered;
-    }
-
-    function render(virtualizedDOM, holder, level) {
-        var holder = holder || document.createElement('div');
-        var level = level || 0;
-        var marginLeft = level * 15;
-        virtualizedDOM.forEach(function (el) {
-            el.blockElement = document.createElement('div');
-            el.contentElement = document.createElement('div');
-
-            VirtualNode.appendClasses(['holder'], el.blockElement);
-            VirtualNode.appendStyles({
-                marginLeft: marginLeft + 'px'
-            }, el.blockElement);
-            VirtualNode.appendStyles({
-                backgroundColor: colors[el.nodeType],
-                border: '1px solid ' + colors[el.nodeType]
-            }, el.contentElement);
-            VirtualNode.appendClasses(['content'], el.contentElement);
-
-            el.blockElement.appendChild(el.contentElement);
-            holder.appendChild(el.blockElement);
-            if (el.children.length) {
-                VirtualNode.appendClasses(['parent'], el.blockElement);
-                registerToggler(el, 'open', notifyClasses);
-                render(el.children, el.blockElement, level + 1);
+    VirtualNode.appendStyles = function (styleObject, el) {
+        for (var i in styleObject) {
+            if (styleObject.hasOwnProperty(i)) {
+                el.style[i] = styleObject[i];
             }
-
-            notifyClasses(el);
-        })
-
-        return holder;
-    }
-
-    function notifyClasses(el) {
-        el.contentElement.innerHTML = el.nodeName + ' ' + el.content;
-        if (el.tag) {
-            el.blockElement.classList.forEach(function (className) {
-                el.contentElement.innerHTML += '.' + className;
-            });
-            el.contentElement.classList.forEach(function (className) {
-                el.contentElement.innerHTML += '.' + className;
-            });
-            el.classList.forEach(function (className) {
-                el.contentElement.innerHTML += '.' + className;
-            });
         }
     }
 
-    function registerToggler(el, className, cb) {
-        if (!(el.contentElement instanceof Element)) throw new Error('That\'s not an element');
-        var mainCb = function () {
-            if (el.opened) {
-                el.opened = false;
-                el.blockElement.classList.remove(className);
-            } else {
-                el.opened = true;
-                el.blockElement.classList.add(className);
-            }
-            cb && cb(el);
-        };
-        el.contentElement.addEventListener('click', mainCb);
+    return VirtualNode;
+}());
 
-        return function () {
-            el.contentElement.removeEventListener('click', mainCb);
-        };
+var Visualization = (function (VirtualNode) {
+    function virtualize(el) {
+        var elements = [];
+        el.childNodes.forEach(function (child) {
+            var virtualElement = new VirtualNode(child);
+            virtualElement.children =
+                virtualElement.children.concat(virtualize(child))
+            elements.push(virtualElement);
+        })
+        return elements;
     }
 
+    function visualize(virtualizedDOM) {
+        var div = document.createElement('div');
+        render(virtualizedDOM, div, 0);
+        return div;
+    }
+
+    function render(virtualizedDOM, holder, level) {
+        virtualizedDOM.forEach(function (virtualElement) {
+            holder.appendChild(virtualElement.holderElement);
+            virtualElement.contentElement.innerHTML =
+                virtualElement.getContent();
+
+            VirtualNode.appendStyles({
+                marginLeft: (level * 15) + 'px'
+            }, virtualElement.holderElement);
+
+            if (virtualElement.children.length) {
+                VirtualNode.appendClasses(['parent'],
+                    virtualElement.holderElement);
+                render(virtualElement.children,
+                    virtualElement.holderElement, level + 1);
+                toggle(virtualElement, 'open');
+            }
+        });
+    }
+
+    function toggle(virtualElement, className) {
+        virtualElement.contentElement.addEventListener('click', function () {
+            if (virtualElement.holderElement.classList.contains(className)) {
+                virtualElement.holderElement.classList.remove(className);
+            } else {
+                virtualElement.holderElement.classList.add(className);
+            }
+        })
+    }
 
     return {
-        vizualize: vizualize,
         virtualize: virtualize,
-        VirtualNode: VirtualNode
+        visualize: visualize
     }
 }(VirtualNode));

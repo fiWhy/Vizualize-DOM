@@ -1,3 +1,3 @@
-var v = Virtual.vizualize(wrapper);
-tree.appendChild(v);
-console.log(v);
+var virtualized = Visualization.virtualize(wrapper);
+var rendered = Visualization.visualize(virtualized);
+document.getElementById('tree').appendChild(rendered);
